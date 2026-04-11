@@ -1,0 +1,7 @@
+torch
+torchaudio
+torchvision
+symusic
+miditok
+basic-pitch
+music21

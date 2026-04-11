@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MuseFlow — AI Band Arrangement Guide</title>
+  <meta name="description"
+    content="Complete guide to MuseFlow: an AI-powered multi-genre, multi-instrument MIDI generation engine that turns melodies into full band arrangements." />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+  <style>
+    /* ===== RESET & BASE ===== */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #0a0a12;
+      --bg-secondary: #12121e;
+      --bg-card: rgba(20, 20, 36, 0.65);
+      --bg-card-hover: rgba(28, 28, 52, 0.8);
+      --border-card: rgba(120, 80, 255, 0.12);
+      --border-card-hover: rgba(120, 80, 255, 0.3);
+      --accent-purple: #9b5cf5;
+      --accent-cyan: #38d9f5;
+      --accent-pink: #f562c4;
+      --accent-green: #3dffc0;
+      --text-primary: #e8e6f0;
+      --text-secondary: #9896a8;
+      --text-muted: #605e72;
+      --gradient-hero: linear-gradient(135deg, #9b5cf5 0%, #38d9f5 50%, #f562c4 100%);
+      --gradient-purple: linear-gradient(135deg, #9b5cf5, #7c3aed);
+      --gradient-cyan: linear-gradient(135deg, #38d9f5, #06b6d4);
+      --gradient-pink: linear-gradient(135deg, #f562c4, #ec4899);
+      --gradient-green: linear-gradient(135deg, #3dffc0, #10b981);
+      --shadow-glow: 0 0 60px rgba(155, 92, 245, 0.15);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font-body: 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--accent-purple);
+      border-radius: 999px;
+    }
+
+    /* ===== SELECTION ===== */
+    ::selection {
+      background: rgba(155, 92, 245, 0.35);
+      color: #fff;
+    }
+
+    /* ===== AMBIENT GLOW BACKGROUNDS ===== */
+    .ambient-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+      z-index: 0;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+
+    .orb-1 {
+      width: 600px;
+      height: 600px;
+      background: var(--accent-purple);
+      top: -200px;
+      left: -100px;
+    }
+
+    .orb-2 {
+      width: 500px;
+      height: 500px;
+      background: var(--accent-cyan);
+      top: 40%;
+      right: -120px;
+      animation-delay: -6s;
+    }
+
+    .orb-3 {
+      width: 450px;
+      height: 450px;
+      background: var(--accent-pink);
+      bottom: -150px;
+      left: 30%;
+      animation-delay: -12s;
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translate(0, 0) scale(1);
+      }
+
+      100% {
+        transform: translate(40px, 30px) scale(1.08);
+      }
+    }
+
+    /* ===== LAYOUT ===== */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== HERO ===== */
+    .hero {
+      position: relative;
+      padding: 100px 0 80px;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(155, 92, 245, 0.12), transparent);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 18px;
+      border-radius: 999px;
+      background: rgba(155, 92, 245, 0.12);
+      border: 1px solid rgba(155, 92, 245, 0.25);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent-purple);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 28px;
+      animation: fadeInDown 0.8s ease;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.8rem, 6vw, 4.5rem);
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      background: var(--gradient-hero);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+      animation: fadeInUp 0.8s ease;
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      max-width: 650px;
+      margin: 0 auto 36px;
+      animation: fadeInUp 0.8s ease 0.15s both;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      flex-wrap: wrap;
+      animation: fadeInUp 0.8s ease 0.3s both;
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat .number {
+      font-size: 2rem;
+      font-weight: 800;
+      background: var(--gradient-hero);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-stat .label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 600;
+    }
+
+    /* ===== NAV ===== */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px) saturate(1.8);
+      -webkit-backdrop-filter: blur(20px) saturate(1.8);
+      background: rgba(10, 10, 18, 0.75);
+      border-bottom: 1px solid rgba(120, 80, 255, 0.08);
+      padding: 14px 0;
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .nav-inner::-webkit-scrollbar {
+      display: none;
+    }
+
+    .nav a {
+      flex-shrink: 0;
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: all 0.25s ease;
+      white-space: nowrap;
+    }
+
+    .nav a:hover,
+    .nav a.active {
+      color: #fff;
+      background: rgba(155, 92, 245, 0.15);
+    }
+
+    /* ===== SECTIONS ===== */
+    section {
+      padding: 80px 0;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent-cyan);
+      margin-bottom: 12px;
+    }
+
+    .section-label .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+    }
+
+    section h2 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 16px;
+    }
+
+    section>.container>p {
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+      max-width: 700px;
+      margin-bottom: 40px;
+    }
+
+    /* ===== CARDS ===== */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius);
+      padding: 32px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.35s ease;
+    }
+
+    .card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-card-hover);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+      flex-shrink: 0;
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.65;
+    }
+
+    /* ===== GRID LAYOUTS ===== */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+    }
+
+    /* ===== PIPELINE (vertical timeline) ===== */
+    .pipeline {
+      position: relative;
+      padding-left: 48px;
+    }
+
+    .pipeline::before {
+      content: '';
+      position: absolute;
+      left: 18px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--accent-purple), var(--accent-cyan), var(--accent-pink), var(--accent-green));
+      border-radius: 2px;
+    }
+
+    .pipeline-step {
+      position: relative;
+      margin-bottom: 40px;
+    }
+
+    .pipeline-step:last-child {
+      margin-bottom: 0;
+    }
+
+    .pipeline-step .step-dot {
+      position: absolute;
+      left: -48px;
+      top: 4px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: #fff;
+      z-index: 2;
+    }
+
+    .pipeline-step .step-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius);
+      padding: 28px;
+      backdrop-filter: blur(8px);
+      transition: all 0.35s ease;
+    }
+
+    .pipeline-step:hover .step-content {
+      border-color: var(--border-card-hover);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .pipeline-step h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .pipeline-step .file-tag {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .pipeline-step p,
+    .pipeline-step ul {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+    }
+
+    .pipeline-step ul {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+
+    .pipeline-step li {
+      margin-bottom: 4px;
+    }
+
+    /* ===== CODE BLOCKS ===== */
+    .code-block {
+      background: #0d0d19;
+      border: 1px solid rgba(120, 80, 255, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 20px 24px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.8;
+      overflow-x: auto;
+      position: relative;
+      margin: 16px 0;
+    }
+
+    .code-block .prompt {
+      color: var(--accent-green);
+      user-select: none;
+    }
+
+    .code-block .comment {
+      color: var(--text-muted);
+    }
+
+    .code-block .cmd {
+      color: var(--text-primary);
+    }
+
+    .code-block .flag {
+      color: var(--accent-cyan);
+    }
+
+    .code-block .file {
+      color: var(--accent-pink);
+    }
+
+    .code-block-label {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ===== ARCHITECTURE TABLE ===== */
+    .arch-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 20px 0;
+      font-size: 0.9rem;
+    }
+
+    .arch-table thead th {
+      padding: 14px 20px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent-cyan);
+      border-bottom: 1px solid rgba(120, 80, 255, 0.15);
+    }
+
+    .arch-table tbody td {
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-secondary);
+    }
+
+    .arch-table tbody tr:hover td {
+      background: rgba(155, 92, 245, 0.05);
+    }
+
+    .arch-table .mono {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-purple);
+    }
+
+    /* ===== GENRE BADGES ===== */
+    .genre-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .genre-badge.classical {
+      background: rgba(155, 92, 245, 0.15);
+      color: var(--accent-purple);
+      border: 1px solid rgba(155, 92, 245, 0.25);
+    }
+
+    .genre-badge.lofi {
+      background: rgba(56, 217, 245, 0.12);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 217, 245, 0.25);
+    }
+
+    .genre-badge.rock {
+      background: rgba(245, 98, 196, 0.12);
+      color: var(--accent-pink);
+      border: 1px solid rgba(245, 98, 196, 0.25);
+    }
+
+    /* ===== ALERT BOXES ===== */
+    .alert {
+      border-radius: var(--radius-sm);
+      padding: 18px 22px;
+      font-size: 0.9rem;
+      margin: 20px 0;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .alert-icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .alert.info {
+      background: rgba(56, 217, 245, 0.06);
+      border: 1px solid rgba(56, 217, 245, 0.15);
+      color: var(--accent-cyan);
+    }
+
+    .alert.warning {
+      background: rgba(251, 191, 36, 0.06);
+      border: 1px solid rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+    }
+
+    .alert.tip {
+      background: rgba(61, 255, 192, 0.06);
+      border: 1px solid rgba(61, 255, 192, 0.15);
+      color: var(--accent-green);
+    }
+
+    /* ===== FILE TREE ===== */
+    .file-tree {
+      background: #0d0d19;
+      border: 1px solid rgba(120, 80, 255, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 24px 28px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 2;
+    }
+
+    .file-tree .dir {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .file-tree .py {
+      color: var(--accent-green);
+    }
+
+    .file-tree .data {
+      color: var(--accent-pink);
+    }
+
+    .file-tree .model {
+      color: #fbbf24;
+    }
+
+    .file-tree .indent {
+      padding-left: 20px;
+    }
+
+    .file-tree .indent2 {
+      padding-left: 40px;
+    }
+
+    /* ===== FOOTER ===== */
+    footer {
+      padding: 60px 0 40px;
+      text-align: center;
+      border-top: 1px solid rgba(120, 80, 255, 0.08);
+    }
+
+    footer p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    footer .footer-brand {
+      font-size: 1.6rem;
+      font-weight: 900;
+      background: var(--gradient-hero);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    /* ===== DIVIDER ===== */
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(155, 92, 245, 0.2), transparent);
+      margin: 0;
+    }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .hero {
+        padding: 70px 0 50px;
+      }
+
+      .hero-stats {
+        gap: 28px;
+      }
+
+      section {
+        padding: 50px 0;
+      }
+
+      .pipeline {
+        padding-left: 40px;
+      }
+
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Ambient background orbs -->
+  <div class="ambient-orb orb-1"></div>
+  <div class="ambient-orb orb-2"></div>
+  <div class="ambient-orb orb-3"></div>
+
+  <!-- ===== NAVIGATION ===== -->
+  <nav class="nav" id="top-nav">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="#overview">Overview</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#pipeline">Pipeline</a>
+        <a href="#scripts">Scripts</a>
+        <a href="#model">Model</a>
+        <a href="#setup">Setup</a>
+        <a href="#usage">Usage</a>
+        <a href="#structure">Structure</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== HERO ===== -->
+  <header class="hero" id="overview">
+    <div class="container">
+      <div class="hero-badge">🎵 AI-Powered Music Generation</div>
+      <h1>MuseFlow</h1>
+      <p>A Transformer-based engine that listens to your melody and arranges a full multi-instrument band around it — in
+        Classical, Lofi, or Rock style.</p>
+
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="number">3</div>
+          <div class="label">Genres</div>
+        </div>
+        <div class="hero-stat">
+          <div class="number">500</div>
+          <div class="label">Files / Genre</div>
+        </div>
+        <div class="hero-stat">
+          <div class="number">Seq2Seq</div>
+          <div class="label">Architecture</div>
+        </div>
+        <div class="hero-stat">
+          <div class="number">REMI</div>
+          <div class="label">Tokenizer</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="divider"></div>
+
+  <!-- ===== ARCHITECTURE OVERVIEW ===== -->
+  <section id="architecture">
+    <div class="container">
+      <div class="section-label"><span class="dot"></span> Architecture</div>
+      <h2>How MuseFlow Works</h2>
+      <p>MuseFlow uses a Sequence-to-Sequence approach: it takes a <strong>melody</strong> as input and generates a full
+        <strong>multi-instrument band arrangement</strong> conditioned on a genre tag.
+      </p>
+
+      <div class="grid-2 fade-in">
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-purple);">🎤</div>
+          <h3>Input: Melody Prompt</h3>
+          <p>A hummed recording or MIDI file is tokenized into a 128-token melody prompt using the REMI tokenizer. Short
+            melodies are automatically looped to fill the full context window.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-cyan);">🎸</div>
+          <h3>Output: Band Arrangement</h3>
+          <p>The Transformer generates up to 384 tokens of multi-instrument arrangement, including program changes,
+            velocities, chords, and tempos — all genre-conditioned.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-pink);">🧠</div>
+          <h3>Transformer Core</h3>
+          <p>A 4-layer, 8-head causal Transformer encoder with 256-dim embeddings. Trained with AdamW, cosine LR
+            schedule, and mixed-precision (FP16) for efficient GPU usage.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-green);">🎛️</div>
+          <h3>Genre Conditioning</h3>
+          <p>Three special genre tokens (<code>10000</code>, <code>10001</code>, <code>10002</code>) act as style
+            switches, telling the model to generate Classical, Lofi, or Rock arrangements.</p>
+        </div>
+      </div>
+
+      <div class="fade-in" style="margin-top: 40px;">
+        <h3 style="margin-bottom: 16px;">Model Specifications</h3>
+        <table class="arch-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Value</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Embedding Dim</td>
+              <td class="mono">256</td>
+              <td>d_model — size of each token embedding</td>
+            </tr>
+            <tr>
+              <td>Attention Heads</td>
+              <td class="mono">8</td>
+              <td>Multi-head self-attention</td>
+            </tr>
+            <tr>
+              <td>Layers</td>
+              <td class="mono">4</td>
+              <td>TransformerEncoderLayer stack</td>
+            </tr>
+            <tr>
+              <td>Prompt Length</td>
+              <td class="mono">128</td>
+              <td>Melody input tokens</td>
+            </tr>
+            <tr>
+              <td>Target Length</td>
+              <td class="mono">384</td>
+              <td>Band arrangement output tokens</td>
+            </tr>
+            <tr>
+              <td>Context Window</td>
+              <td class="mono">512</td>
+              <td>Maximum sequence length during generation</td>
+            </tr>
+            <tr>
+              <td>Optimizer</td>
+              <td class="mono">AdamW</td>
+              <td>LR=3e-4, weight_decay=0.01</td>
+            </tr>
+            <tr>
+              <td>LR Schedule</td>
+              <td class="mono">CosineAnnealing</td>
+              <td>eta_min=1e-6 over 25 epochs</td>
+            </tr>
+            <tr>
+              <td>Precision</td>
+              <td class="mono">FP16</td>
+              <td>Mixed-precision via torch.amp</td>
+            </tr>
+            <tr>
+              <td>Batch Size</td>
+              <td class="mono">4</td>
+              <td>Fits ~6 GB VRAM (RTX 3050)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== PIPELINE ===== -->
+  <section id="pipeline">
+    <div class="container">
+      <div class="section-label"><span class="dot"></span> Pipeline</div>
+      <h2>End-to-End Pipeline</h2>
+      <p>From raw MIDI files to AI-generated band arrangements in five stages.</p>
+
+      <div class="pipeline fade-in">
+        <!-- Step 1 -->
+        <div class="pipeline-step">
+          <div class="step-dot" style="background: var(--gradient-purple);">1</div>
+          <div class="step-content">
+            <div class="file-tag" style="background: rgba(155,92,245,0.12); color: var(--accent-purple);">
+              download_dataset.py</div>
+            <h3>Download &amp; Classify Dataset</h3>
+            <p>Downloads the <strong>Lakh MIDI Clean</strong> dataset (~223 MB, ~6,000+ MIDI files), then filters and
+              classifies them into three genres.</p>
+            <ul>
+              <li>Multi-instrument filter: ≥2 tracks, ≥2 distinct programs, 30–15,000 notes</li>
+              <li>Genre classification via scoring heuristic on MIDI program numbers</li>
+              <li>Targets: <span class="genre-badge classical">🎻 Classical</span> <span class="genre-badge lofi">🎹
+                  Lofi</span> <span class="genre-badge rock">🎸 Rock</span> — 500 files each</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="pipeline-step">
+          <div class="step-dot" style="background: var(--gradient-cyan);">2</div>
+          <div class="step-content">
+            <div class="file-tag" style="background: rgba(56,217,245,0.1); color: var(--accent-cyan);">rescue.py</div>
+            <h3>Rescue Single-Track Lofi Files</h3>
+            <p>Some Lofi MIDI files are squished into a single track. The rescuer splits them into multi-instrument
+              arrangements by pitch register:</p>
+            <ul>
+              <li><strong>≥72</strong> — Melody → Electric Piano (Prog 4)</li>
+              <li><strong>48–71</strong> — Pad/Chords → Warm Pad (Prog 89)</li>
+              <li><strong>&lt;48</strong> — Bass → Fingered E.Bass (Prog 34)</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="pipeline-step">
+          <div class="step-dot" style="background: var(--gradient-pink);">3</div>
+          <div class="step-content">
+            <div class="file-tag" style="background: rgba(245,98,196,0.1); color: var(--accent-pink);">preprocess.py
+            </div>
+            <h3>Tokenize into Seq2Seq Pairs</h3>
+            <p>Each MIDI file is split into a <strong>Melody</strong> (highest-pitched track) and a
+              <strong>Band</strong> (all remaining tracks). Both are converted to REMI tokens, with a genre tag injected
+              at the start of the band sequence.
+            </p>
+            <ul>
+              <li>Melody = prompt (128 tokens), Band = target (384 tokens)</li>
+              <li>Genre IDs: <code>10000</code> (Classical), <code>10001</code> (Lofi), <code>10002</code> (Rock)</li>
+              <li>Output: JSON files in <code>tokens_seq2seq/</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="pipeline-step">
+          <div class="step-dot" style="background: var(--gradient-green);">4</div>
+          <div class="step-content">
+            <div class="file-tag" style="background: rgba(61,255,192,0.1); color: var(--accent-green);">train.py</div>
+            <h3>Train the Transformer</h3>
+            <p>The Seq2Seq pairs are fed into the Transformer model. The model learns to predict each next token in the
+              combined <code>[Melody | GenreTag | BandArrangement]</code> sequence.</p>
+            <ul>
+              <li>25 epochs with cosine annealing LR schedule</li>
+              <li>Mixed-precision (FP16) for ~50% VRAM savings</li>
+              <li>Gradient clipping at max_norm=1.0</li>
+              <li>Output: <code>museflow_translator.pth</code> (~40 MB)</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="pipeline-step">
+          <div class="step-dot" style="background: var(--gradient-hero);">5</div>
+          <div class="step-content">
+            <div class="file-tag" style="background: rgba(155,92,245,0.12); color: var(--accent-purple);">generate.py
+            </div>
+            <h3>Generate Band Arrangements</h3>
+            <p>Feed a melody + genre choice into the trained model. It auto-regressively generates a full
+              multi-instrument arrangement with creative sampling and humanized durations.</p>
+            <ul>
+              <li>Melody looping — short inputs are tiled to fill the 128-token window</li>
+              <li>Top-k (50) + nucleus (p=0.95) sampling at temperature 0.9</li>
+              <li>Duration humanizer adds ±15% jitter for a natural feel</li>
+              <li>Output: <code>AI_Band_{GENRE}_Output.mid</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== SCRIPTS DEEP DIVE ===== -->
+  <section id="scripts">
+    <div class="container">
+      <div class="section-label"><span class="dot"></span> Scripts Reference</div>
+      <h2>Script Details</h2>
+      <p>A closer look at every script in the project — what it does, key functions, and important parameters.</p>
+
+      <div class="grid-3 fade-in">
+        <!-- download_dataset -->
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-purple);">⬇️</div>
+          <h3>download_dataset.py</h3>
+          <p><strong>Functions:</strong></p>
+          <p style="margin-top: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent-green);">
+            download_lakh()<br>
+            extract_lakh()<br>
+            classify_genre()<br>
+            filter_and_classify()
+          </p>
+          <p style="margin-top: 12px;">Downloads Lakh MIDI Clean from Columbia's servers, extracts with Windows-safe
+            filenames, and classifies into genre folders using instrument heuristics.</p>
+        </div>
+
+        <!-- preprocess -->
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-pink);">⚙️</div>
+          <h3>preprocess.py</h3>
+          <p><strong>Functions:</strong></p>
+          <p style="margin-top: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent-green);">
+            build_tokenizer()<br>
+            process_seq2seq()
+          </p>
+          <p style="margin-top: 12px;">Builds a REMI tokenizer with genre special tokens, splits each MIDI into melody +
+            band, and saves tokenized Seq2Seq pairs as JSON.</p>
+        </div>
+
+        <!-- train -->
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-green);">🚀</div>
+          <h3>train.py</h3>
+          <p><strong>Classes:</strong></p>
+          <p style="margin-top: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent-green);">
+            Seq2SeqDataset<br>
+            MuseFlowTransformer
+          </p>
+          <p style="margin-top: 12px;">Custom PyTorch Dataset that stitches prompt+target, and a causal Transformer
+            trained with mixed-precision AMP and cosine LR scheduling.</p>
+        </div>
+
+        <!-- generate -->
+        <div class="card">
+          <div class="card-icon" style="background: var(--gradient-cyan);">🎵</div>
+          <h3>generate.py</h3>
+          <p><strong>Functions:</strong></p>
+          <p style="margin-top: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent-green);">
+            sample_next_token()<br>
+            loop_melody()<br>
+            humanize_durations()<br>
+            generate_band()
+          </p>
+          <p style="margin-top: 12px;">Loads model, accepts melody + genre, generates tokens autoregressively, humanizes
+            durations, and exports MIDI.</p>
+        </div>
+
+        <!-- rescue -->
+        <div class="card">
+          <div class="card-icon" style="background: rgba(251,191,36,0.2); color: #fbbf24;">🚑</div>
+          <h3>rescue.py</h3>
+          <p><strong>Functions:</strong></p>
+          <p style="margin-top: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent-green);">
+            rescue_lofi()
+          </p>
+          <p style="margin-top: 12px;">Post-processes single-track Lofi MIDI files by splitting notes into 3 instrument
+            tracks based on pitch range (E.Piano, Pad, Bass).</p>
+        </div>
+
+        <!-- transcribe -->
+        <div class="card">
+          <div class="card-icon" style="background: rgba(155,92,245,0.2); color: var(--accent-purple);">🎤</div>
+          <h3>transcribe.py</h3>
+          <p><strong>Functions:</strong></p>
+          <p style="margin-top: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent-green);">
+            predict_and_save()
+          </p>
+          <p style="margin-top: 12px;">Uses Spotify's <strong>Basic Pitch</strong> ML model to convert a
+            <code>.wav</code> audio recording (e.g., a hum) into a MIDI file for use as input.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== MODEL DEEP DIVE ===== -->
+  <section id="model">
+    <div class="container">
+      <div class="section-label"><span class="dot"></span> Model Details</div>
+      <h2>The Transformer Engine</h2>
+      <p>Understanding the training data format, model internals, and generation strategy.</p>
+
+      <div class="fade-in">
+        <!-- Training Data Format -->
+        <div class="card" style="margin-bottom: 24px;">
+          <h3>📊 Training Data Format</h3>
+          <p style="margin-top: 12px;">Each training sample is a 512-token sequence formed by concatenating:</p>
+          <div class="code-block" style="margin-top: 16px;">
+            <span class="code-block-label">SEQUENCE FORMAT</span>
+            <span class="comment">// Total length: 128 + 384 = 512 tokens</span>
+
+            <span class="cmd">[</span> <span class="flag">Melody Tokens (128)</span> <span class="cmd">|</span> <span
+              class="file">Genre Tag (1)</span> <span class="cmd">|</span> <span class="prompt">Band Tokens (383)</span>
+            <span class="cmd">]</span>
+
+            <span class="comment">// Example genre tags:</span>
+            <span class="file">10000</span> → Classical | <span class="file">10001</span> → Lofi | <span
+              class="file">10002</span> → Rock
+          </div>
+          <p style="margin-top: 12px;">The model learns via next-token prediction with cross-entropy loss (padding index
+            <code>0</code> is ignored). This means it learns to predict the band arrangement given the melody context.
+          </p>
+        </div>
+
+        <!-- Sampling Strategy -->
+        <div class="grid-2">
+          <div class="card">
+            <h3>🎲 Sampling Strategy</h3>
+            <p style="margin-top: 8px;">During inference, greedy decoding is replaced with a sophisticated sampling
+              pipeline:</p>
+            <ul style="margin-top: 12px; padding-left: 18px; color: var(--text-secondary); font-size: 0.9rem;">
+              <li><strong>Temperature = 0.9</strong> — Slightly sharpens the probability distribution</li>
+              <li><strong>Top-k = 50</strong> — Limits candidates to the 50 most likely tokens</li>
+              <li><strong>Nucleus (top-p) = 0.95</strong> — Further trims to the 95% cumulative probability mass</li>
+            </ul>
+            <p style="margin-top: 12px;">This allows rare but musically important tokens (like program changes for new
+              instruments) to appear naturally.</p>
+          </div>
+
+          <div class="card">
+            <h3>🥁 Duration Humanizer</h3>
+            <p style="margin-top: 8px;">After decoding tokens back into MIDI, a humanization pass adds natural feel:</p>
+            <ul style="margin-top: 12px; padding-left: 18px; color: var(--text-secondary); font-size: 0.9rem;">
+              <li><strong>±15% duration jitter</strong> — Each note's length varies slightly</li>
+              <li><strong>±5% onset drift</strong> — Notes start slightly early or late</li>
+              <li>Prevents the band from sounding rigidly quantized</li>
+              <li>Creates a natural "human performance" feel</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== SETUP ===== -->
+  <section id="setup">
+    <div class="container">
+      <div class="section-label"><span class="dot"></span> Getting Started</div>
+      <h2>Setup &amp; Installation</h2>
+      <p>Everything you need to get MuseFlow running on your machine.</p>
+
+      <div class="fade-in">
+        <div class="alert info">
+          <span class="alert-icon">💡</span>
+          <div><strong>Requirements:</strong> Python 3.9+, CUDA-compatible GPU recommended (tested on RTX 3050 with 6 GB
+            VRAM). CPU training works but is significantly slower.</div>
+        </div>
+
+        <h3 style="margin: 28px 0 12px;">1. Create a Virtual Environment</h3>
+        <div class="code-block">
+          <span class="code-block-label">Terminal</span>
+          <span class="prompt">$</span> <span class="cmd">python -m venv env</span>
+          <span class="prompt">$</span> <span class="cmd">env\Scripts\activate</span> <span class="comment">#
+            Windows</span>
+          <span class="prompt">$</span> <span class="cmd">source env/bin/activate</span> <span class="comment"># macOS /
+            Linux</span>
+        </div>
+
+        <h3 style="margin: 28px 0 12px;">2. Install Dependencies</h3>
+        <div class="code-block">
+          <span class="code-block-label">Terminal</span>
+          <span class="prompt">$</span> <span class="cmd">pip install torch torchvision torchaudio</span> <span
+            class="flag">--index-url https://download.pytorch.org/whl/cu121</span>
+          <span class="prompt">$</span> <span class="cmd">pip install symusic miditok basic-pitch music21</span>
+        </div>
+
+        <div class="alert tip">
+          <span class="alert-icon">✅</span>
+          <div><strong>Verify GPU:</strong> Run <code>python test_gpu.py</code> to check that CUDA is detected. You
+            should see <code>torch.cuda.is_available() = True</code>.</div>
+        </div>
+
+        <h3 style="margin: 28px 0 12px;">3. Run the Full Pipeline</h3>
+        <div class="code-block">
+          <span class="code-block-label">Terminal</span>
+          <span class="comment"># Step 1: Download &amp; classify MIDI dataset</span>
+          <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">download_dataset.py</span>
+
+          <span class="comment"># Step 2: (Optional) Rescue single-track Lofi files</span>
+          <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">rescue.py</span>
+
+          <span class="comment"># Step 3: Tokenize into Seq2Seq pairs</span>
+          <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">preprocess.py</span>
+
+          <span class="comment"># Step 4: Train the Transformer (~25 epochs)</span>
+          <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">train.py</span>
+
+          <span class="comment"># Step 5: Generate music!</span>
+          <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">generate.py</span>
+          <span class="comment"># Or with a custom melody file:</span>
+          <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">generate.py</span> <span
+            class="flag">hum_basic_pitch.mid</span>
+        </div>
+
+        <div class="alert warning">
+          <span class="alert-icon">⚠️</span>
+          <div><strong>First run:</strong> The dataset download is ~223 MB and extraction + classification can take
+            10–20 minutes. Training takes roughly 15–30 min on an RTX 3050.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== USAGE ===== -->
+  <section id="usage">
+    <div class="container">
+      <div class="section-label"><span class="dot"></span> Usage</div>
+      <h2>Generating Music</h2>
+      <p>How to use MuseFlow to turn your melodies into full band arrangements.</p>
+
+      <div class="fade-in">
+        <div class="grid-2">
+          <div class="card">
+            <h3>🎤 Option A: From a Hum / Audio</h3>
+            <p style="margin-top: 8px;">Record yourself humming into <code>hum.wav</code>, then transcribe it to MIDI
+              and generate:</p>
+            <div class="code-block" style="margin-top: 12px;">
+              <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">transcribe.py</span>
+              <span class="comment"># Creates hum_basic_pitch.mid</span>
+
+              <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">generate.py</span> <span
+                class="flag">hum_basic_pitch.mid</span>
+              <span class="comment"># Choose genre → outputs AI_Band_GENRE_Output.mid</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>🎹 Option B: From an Existing MIDI</h3>
+            <p style="margin-top: 8px;">Pass any MIDI file directly as the melody input:</p>
+            <div class="code-block" style="margin-top: 12px;">
+              <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">generate.py</span> <span
+                class="flag">my_melody.mid</span>
+              <span class="comment"># Interactive prompts ask for genre (classical/lofi/rock)</span>
+              <span class="comment"># and loop count (1-8 bars)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card fade-in" style="margin-top: 24px;">
+          <h3>🎛️ Generation Parameters</h3>
+          <p style="margin-top: 8px;">During generation, you'll be asked two questions interactively:</p>
+          <table class="arch-table" style="margin-top: 16px;">
+            <thead>
+              <tr>
+                <th>Prompt</th>
+                <th>Options</th>
+                <th>Effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Genre</td>
+                <td class="mono">classical / lofi / rock</td>
+                <td>Selects the style of the band arrangement</td>
+              </tr>
+              <tr>
+                <td>Loop Count</td>
+                <td class="mono">1 – 8</td>
+                <td>Controls song length (~150 tokens per loop)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== PROJECT STRUCTURE ===== -->
+  <section id="structure">
+    <div class="container">
+      <div class="section-label"><span class="dot"></span> Project Structure</div>
+      <h2>File Tree</h2>
+      <p>Complete layout of the MuseFlow project directory.</p>
+
+      <div class="fade-in">
+        <div class="file-tree">
+          <span class="dir">MuseFlow/</span>
+          <span class="indent">├── <span class="py">download_dataset.py</span> <span style="color: var(--text-muted);">—
+              Downloads &amp; classifies Lakh MIDI</span></span>
+          <span class="indent">├── <span class="py">rescue.py</span> <span style="color: var(--text-muted);">— Splits
+              single-track Lofi into multi-instrument</span></span>
+          <span class="indent">├── <span class="py">get_classical_data.py</span> <span
+              style="color: var(--text-muted);">— Downloads Bach chorales from music21</span></span>
+          <span class="indent">├── <span class="py">preprocess.py</span> <span style="color: var(--text-muted);">—
+              Tokenizes MIDI → Seq2Seq JSON pairs</span></span>
+          <span class="indent">├── <span class="py">train.py</span> <span style="color: var(--text-muted);">— Trains the
+              Transformer model</span></span>
+          <span class="indent">├── <span class="py">generate.py</span> <span style="color: var(--text-muted);">—
+              Generates band arrangements from melodies</span></span>
+          <span class="indent">├── <span class="py">transcribe.py</span> <span style="color: var(--text-muted);">— Audio
+              → MIDI via Basic Pitch</span></span>
+          <span class="indent">├── <span class="py">test_gpu.py</span> <span style="color: var(--text-muted);">— Quick
+              CUDA availability check</span></span>
+          <span class="indent">├── <span class="model">museflow_model.pth</span> <span
+              style="color: var(--text-muted);">— Trained model weights (~21 MB)</span></span>
+          <span class="indent">├── <span class="model">museflow_translator.pth</span> <span
+              style="color: var(--text-muted);">— Seq2Seq translator weights (~40 MB)</span></span>
+          <span class="indent">├── <span class="data">hum.wav</span> <span style="color: var(--text-muted);">— Sample
+              audio input</span></span>
+          <span class="indent">├── <span class="data">hum_basic_pitch.mid</span> <span
+              style="color: var(--text-muted);">— Transcribed melody MIDI</span></span>
+          <span class="indent">├── <span class="data">AI_Band_*.mid</span> <span style="color: var(--text-muted);">—
+              Generated output files</span></span>
+          <span class="indent">├── <span class="dir">dataset/</span> <span style="color: var(--text-muted);">—
+              Classified MIDI dataset</span></span>
+          <span class="indent2">├── <span class="dir">classical/</span> <span style="color: var(--text-muted);">— 500
+              classical MIDI files</span></span>
+          <span class="indent2">├── <span class="dir">lofi/</span> <span style="color: var(--text-muted);">— 500 lofi
+              MIDI files</span></span>
+          <span class="indent2">└── <span class="dir">rock/</span> <span style="color: var(--text-muted);">— 500 rock
+              MIDI files</span></span>
+          <span class="indent">├── <span class="dir">tokens_seq2seq/</span> <span style="color: var(--text-muted);">—
+              Tokenized Seq2Seq JSON pairs</span></span>
+          <span class="indent">└── <span class="dir">_lakh_download/</span> <span style="color: var(--text-muted);">—
+              Raw Lakh MIDI download cache</span></span>
+        </div>
+      </div>
+
+      <!-- Genre Classification -->
+      <div class="fade-in" style="margin-top: 40px;">
+        <h3 style="margin-bottom: 16px;">🎯 Genre Classification Heuristic</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 20px;">The classifier scores each MIDI file across three
+          genre dimensions based on its General MIDI program numbers:</p>
+
+        <div class="grid-3">
+          <div class="card" style="border-color: rgba(155, 92, 245, 0.2);">
+            <span class="genre-badge classical">🎻 Classical</span>
+            <p style="margin-top: 14px; font-size: 0.88rem;">
+              <strong>Strings</strong> (Prog 40–51) +4<br>
+              <strong>Woodwinds</strong> (Prog 64–79) +4<br>
+              <strong>Brass</strong> (Prog 56–63) +3<br>
+              Strings + Woodwinds combo +3<br>
+              Strings without drums/guitar +3
+            </p>
+          </div>
+          <div class="card" style="border-color: rgba(56, 217, 245, 0.2);">
+            <span class="genre-badge lofi">🎹 Lofi</span>
+            <p style="margin-top: 14px; font-size: 0.88rem;">
+              <strong>Electric Piano</strong> (Prog 4–5) +5<br>
+              <strong>Pads</strong> (Prog 88–95) +4<br>
+              <strong>Vibraphone</strong> (Prog 11–14) +3<br>
+              E.Piano + Bass combo +3<br>
+              Synth Lead / Pads +2
+            </p>
+          </div>
+          <div class="card" style="border-color: rgba(245, 98, 196, 0.2);">
+            <span class="genre-badge rock">🎸 Rock</span>
+            <p style="margin-top: 14px; font-size: 0.88rem;">
+              <strong>Electric Guitar</strong> (Prog 25–31) +6<br>
+              <strong>Distortion</strong> (Prog 29–30) +5<br>
+              Drums + E.Guitar combo +3<br>
+              Bass + E.Guitar combo +2<br>
+              Organ + E.Guitar combo +2
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== FOOTER ===== -->
+  <footer>
+    <div class="container">
+      <div class="footer-brand">MuseFlow</div>
+      <p>AI-Powered Multi-Genre Band Arrangement Engine</p>
+      <p style="margin-top: 8px; color: var(--text-muted);">Built with PyTorch · MidiTok · SyMusic · Basic Pitch</p>
+    </div>
+  </footer>
+
+  <!-- ===== SCROLL REVEAL ===== -->
+  <script>
+    // Intersection Observer for fade-in animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // Active nav link tracking
+    const sections = document.querySelectorAll('section[id], header[id]');
+    const navLinks = document.querySelectorAll('.nav a');
+
+    const navObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === '#' + entry.target.id);
+          });
+        }
+      });
+    }, { threshold: 0.3 });
+
+    sections.forEach(sec => navObserver.observe(sec));
+  </script>
+</body>
+
+</html>

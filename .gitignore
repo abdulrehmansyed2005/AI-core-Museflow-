@@ -1,0 +1,39 @@
+# ===== DATASET & GENERATED DATA =====
+backend/dataset/
+backend/_lakh_download/
+backend/tokens/
+backend/tokens_seq2seq/
+
+# ===== TRAINED MODEL WEIGHTS =====
+backend/*.pth
+
+# ===== GENERATED MIDI OUTPUTS =====
+backend/AI_Band_*.mid
+
+# ===== AUDIO FILES =====
+backend/*.wav
+
+# ===== VIRTUAL ENVIRONMENT =====
+backend/env/
+env/
+venv/
+.venv/
+
+# ===== PYTHON =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.code-workspace
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
