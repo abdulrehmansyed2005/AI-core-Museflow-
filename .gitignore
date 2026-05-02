@@ -12,6 +12,10 @@ backend/AI_Band_*.mid
 
 # ===== AUDIO FILES =====
 backend/*.wav
+backend/uploads/
+backend/outputs/
+*.mp3
+*.mpeg
 
 # ===== VIRTUAL ENVIRONMENT =====
 backend/env/

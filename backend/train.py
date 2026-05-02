@@ -6,14 +6,23 @@ from pathlib import Path
 
 # --- 1. THE NEW SEQ2SEQ DATA LOADER ---
 class Seq2SeqDataset(Dataset):
-    def __init__(self, prompt_len=128, target_len=384):
+    def __init__(self, prompt_len=128, target_len=384, max_per_genre=2000):
         self.data = []
         self.vocab_size = 0
         
         print("Loading Melody-to-Band pairs into memory...")
-        token_files = list(Path("tokens_seq2seq").glob("*.json"))
+        token_dir = Path("tokens_seq2seq")
         
-        for file in token_files:
+        # Group files by genre prefix and cap each at max_per_genre
+        genres = ["classical", "lofi", "rock"]
+        selected_files = []
+        for genre in genres:
+            genre_files = sorted(token_dir.glob(f"{genre}_*.json"))
+            capped = genre_files[:max_per_genre]
+            selected_files.extend(capped)
+            print(f"  {genre.upper()}: {len(capped)}/{len(genre_files)} files selected")
+        
+        for file in selected_files:
             with open(file, 'r') as f:
                 content = json.load(f)
                 prompt = content['prompt']
@@ -60,7 +69,10 @@ class MuseFlowTransformer(nn.Module):
 # --- 3. THE TRAINING LOOP (Now with Mixed Precision & LR Scheduling) ---
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    use_amp = device.type == "cuda"  # Mixed precision only on GPU
     print(f"🔥 Booting up the Translator on: {device.type.upper()}")
+    if not use_amp:
+        print("⚠️  No CUDA GPU detected — training on CPU (slower, no mixed precision)")
 
     dataset = Seq2SeqDataset(prompt_len=128, target_len=384)
     
@@ -73,14 +85,15 @@ def train():
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=0.01)
     criterion = nn.CrossEntropyLoss(ignore_index=0)  # Ignore padding zeros
     
-    # Cosine annealing scheduler — smoothly decays LR to near-zero
-    epochs = 25
+    # Higher epoch count for more data
+    epochs = 50
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
     
     # Mixed precision scaler — halves VRAM usage by using float16 where safe
-    scaler = torch.amp.GradScaler('cuda')
+    scaler = torch.amp.GradScaler('cuda') if use_amp else None
     
-    print(f"🚀 Starting Seq2Seq Training ({epochs} epochs, mixed precision)...")
+    mode_str = "mixed precision" if use_amp else "float32 (CPU)"
+    print(f"🚀 Starting Seq2Seq Training ({epochs} epochs, {mode_str})...")
     print(f"   Model params: {sum(p.numel() for p in model.parameters()):,}")
     
     for epoch in range(epochs):
@@ -92,20 +105,24 @@ def train():
             
             optimizer.zero_grad()
             
-            # Mixed precision forward pass
-            with torch.amp.autocast('cuda'):
+            if use_amp:
+                # Mixed precision forward pass (GPU)
+                with torch.amp.autocast('cuda'):
+                    predictions = model(x)
+                    loss = criterion(predictions.transpose(1, 2), y)
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                # Standard forward pass (CPU)
                 predictions = model(x)
                 loss = criterion(predictions.transpose(1, 2), y)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
             
-            # Mixed precision backward pass
-            scaler.scale(loss).backward()
-            
-            # Gradient clipping to prevent exploding gradients
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            
-            scaler.step(optimizer)
-            scaler.update()
             total_loss += loss.item()
             
         scheduler.step()
