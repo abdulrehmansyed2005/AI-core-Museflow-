@@ -9,7 +9,7 @@ MuseFlow is a Transformer-based system that listens to your melody and arranges 
 ## ✨ Features
 
 - 🎤 **Hum-to-MIDI** — Record a melody, transcribe it via Basic Pitch, and feed it to the AI
-- 🧠 **Seq2Seq Transformer** — 4-layer, 8-head causal Transformer trained on 1,500 multi-instrument MIDI files
+- 🧠 **Seq2Seq Transformer** — 4-layer, 8-head causal Transformer trained on 6,000 multi-instrument MIDI files
 - 🎛️ **Genre Conditioning** — Special genre tokens steer the model toward Classical, Lofi, or Rock arrangements
 - 🥁 **Duration Humanizer** — Post-processing adds natural timing jitter so the output doesn't sound robotic
 - 🔁 **Melody Looping** — Short inputs are automatically tiled to fill the full context window
