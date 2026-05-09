@@ -1,4 +1,8 @@
 import torch
+import sys
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import json
@@ -6,7 +10,7 @@ from pathlib import Path
 
 # --- 1. THE NEW SEQ2SEQ DATA LOADER ---
 class Seq2SeqDataset(Dataset):
-    def __init__(self, prompt_len=128, target_len=384, max_per_genre=2000):
+    def __init__(self, prompt_len=128, target_len=384, max_per_genre=4000):
         self.data = []
         self.vocab_size = 0
         

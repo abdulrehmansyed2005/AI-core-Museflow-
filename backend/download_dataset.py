@@ -5,6 +5,10 @@ Only keeps multi-instrument files (≥2 tracks, ≥2 distinct programs).
 """
 
 import os
+import sys
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 import shutil
 import re
 import tarfile
@@ -20,7 +24,7 @@ EXTRACT_DIR = DOWNLOAD_DIR / "clean_midi"
 TAR_FILE = DOWNLOAD_DIR / "clean_midi.tar.gz"
 
 DATASET_DIR = Path("dataset")
-TARGET_PER_GENRE = 500
+TARGET_PER_GENRE = 4000
 
 # Minimum requirements — relaxed to catch more files
 MIN_TRACKS = 2          # At least 2 tracks with notes

@@ -3,6 +3,12 @@ MuseFlow Web API
 Flask server that wraps the generation pipeline for the web UI.
 """
 
+
+import sys, io
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 import os
 import sys
 import json
@@ -122,9 +128,73 @@ def quantize_score(score, grid_division=4):
             # Snap duration (minimum 1 grid unit)
             note.duration = max(grid_ticks, round(note.duration / grid_ticks) * grid_ticks)
             # Flatten velocity slightly to avoid 'stabs'
-            note.velocity = int(60 + (note.velocity * 0.4)) 
+            note.velocity = int(60 + (note.velocity * 0.4))
             
     return score
+
+
+def normalize_score(score):
+    """
+    Fixes instruments playing out of order by:
+    1. Removing tracks with no notes.
+    2. Finding the global earliest note onset across ALL tracks.
+    3. Shifting every track by that offset so all instruments start at tick 0.
+    4. Sorting notes within each track chronologically.
+    """
+    # Drop empty tracks
+    score.tracks = [t for t in score.tracks if len(t.notes) > 0]
+    if not score.tracks:
+        return score
+
+    # Find the earliest onset across all tracks
+    global_start = min(
+        note.time
+        for track in score.tracks
+        for note in track.notes
+    )
+
+    # Shift all notes so the earliest onset is at tick 0
+    if global_start != 0:
+        for track in score.tracks:
+            for note in track.notes:
+                note.time = max(0, note.time - global_start)
+
+    # Sort notes within each track by onset time
+    for track in score.tracks:
+        track.notes.sort(key=lambda n: n.time)
+
+    return score
+
+
+def consolidate_tracks(score):
+    """
+    REMI decoding fragments each program change into a new track, so the
+    same instrument ends up as many 1-note tracks.  This merges all tracks
+    that share the same MIDI program number into one, keeping all their notes.
+    Tracks with fewer than 3 notes after merging are dropped as noise.
+    """
+    from collections import defaultdict
+    program_map = defaultdict(list)   # program -> [Track, ...]
+
+    for track in score.tracks:
+        prog = getattr(track, 'program', 0) or 0
+        program_map[prog].append(track)
+
+    new_tracks = []
+    for prog, tracks in program_map.items():
+        # Use the first track as the base and pool all notes into it
+        base = tracks[0]
+        for extra in tracks[1:]:
+            base.notes.extend(extra.notes)
+        base.notes.sort(key=lambda n: n.time)
+        if len(base.notes) >= 3:          # drop near-empty tracks
+            new_tracks.append(base)
+
+    score.tracks = new_tracks
+    return score
+
+
+
 
 
 # --- Flask App ---
@@ -221,13 +291,16 @@ def generate():
                     if midi_path.exists():
                         midi_path.unlink()
                     
-                    predict_and_save(
-                        audio_path_list=[str(filepath)],
-                        output_directory=str(UPLOAD_DIR),
-                        save_midi=True, sonify_midi=False,
-                        save_model_outputs=False, save_notes=False,
-                        model_or_model_path=ICASSP_2022_MODEL_PATH
-                    )
+                    try:
+                        predict_and_save(
+                            audio_path_list=[str(filepath)],
+                            output_directory=str(UPLOAD_DIR),
+                            save_midi=True, sonify_midi=False,
+                            save_model_outputs=False, save_notes=False,
+                            model_or_model_path=ICASSP_2022_MODEL_PATH
+                        )
+                    except UnicodeEncodeError:
+                        pass  # basic_pitch emoji print failed on Windows — MIDI was already saved
                     melody_score = Score(str(midi_path))
                 else:
                     melody_score = Score(str(filepath))
@@ -249,7 +322,8 @@ def generate():
         melody_prompt = loop_melody(melody_tokens, target_length=128)
 
         # Build starting sequence
-        gen_tokens = num_loops * 150
+        # 200 tokens/loop: enough for multi-instrument phrases without overloading
+        gen_tokens = num_loops * 200
         current_sequence = melody_prompt + [genre_tag]
 
         # Generate
@@ -262,31 +336,72 @@ def generate():
             next_token = sample_next_token(logits, temperature=temperature, top_k=50, top_p=0.95)
             current_sequence.append(next_token)
 
-        # Decode ONLY the generated tokens (skip the prompt to avoid overlapping melody)
-        from miditok import REMI, TokenizerConfig
-        config = TokenizerConfig(
-            num_velocities=32, use_chords=True,
-            use_programs=True, use_tempos=True
-        )
-        tokenizer = REMI(config)
+        # 1. Decode the original melody
+        melody_only_tokens = [t for t in melody_prompt if t not in [10000, 10001, 10002] and t != 0]
+        melody_score = tokenizer.decode(melody_only_tokens)
+        
+        # Calculate melody duration (the "Master Window")
+        melody_duration = 0
+        if melody_score.tracks:
+            melody_score.tracks[0].name = "Main Melody"
+            if melody_score.tracks[0].notes:
+                melody_duration = max(n.time + n.duration for n in melody_score.tracks[0].notes)
 
+        # 2. Decode the generated band
         generated_only = current_sequence[129:]
-        final_tokens = [t for t in generated_only if t not in [10000, 10001, 10002]]
-        generated_score = tokenizer.decode(final_tokens)
+        band_tokens = [t for t in generated_only if t not in [10000, 10001, 10002] and t != 0]
+        band_score = tokenizer.decode(band_tokens)
+
+        # 3. Combine and Constrain to Melody Duration
+        for track in band_score.tracks:
+            if not track.notes: continue
+            
+            # Sort and Shift to 0
+            track.notes.sort(key=lambda n: n.time)
+            first_onset = track.notes[0].time
+            for n in track.notes:
+                n.time = max(0, n.time - first_onset)
+            
+            # Loop/Clip to fit the Melody Window
+            if melody_duration > 0:
+                original_notes = [n for n in track.notes if n.time < melody_duration]
+                if not original_notes: continue
+                
+                track_span = max(n.time + n.duration for n in original_notes)
+                new_notes = list(original_notes)
+                
+                # Loop to fill if band is shorter than melody
+                current_end = track_span
+                import copy
+                while current_end < melody_duration and track_span > 0:
+                    for n in original_notes:
+                        if current_end + n.time < melody_duration:
+                            nn = copy.copy(n)
+                            nn.time += current_end
+                            new_notes.append(nn)
+                    current_end += track_span
+                
+                # Final Clip: Remove any note that starts or ends after the melody
+                track.notes = [n for n in new_notes if n.time < melody_duration]
+                for n in track.notes:
+                    if n.time + n.duration > melody_duration:
+                        n.duration = max(1, melody_duration - n.time)
+            
+            melody_score.tracks.append(track)
         
-        # Snap the band to the rhythmic grid (16th notes)
+        generated_score = melody_score
+
+        # 4. Final Polish
         generated_score = quantize_score(generated_score, grid_division=4)
-        
-        # Light humanization only — 5% duration jitter, no onset drift
+        generated_score = normalize_score(generated_score)
         generated_score = humanize_durations(generated_score, jitter_pct=0.05)
 
-        # Set a sensible default tempo (120 BPM) if none exists
-        from symusic import Score as SyScore, Tempo as SyTempo
-        if len(generated_score.tempos) == 0:
+        # Tempo and Save
+        from symusic import Tempo as SyTempo
+        if not generated_score.tempos:
             generated_score.tempos.append(SyTempo(0, 120.0))
 
-        # Save output
-        output_name = f"AI_Band_{genre.upper()}_{random.randint(1000,9999)}.mid"
+        output_name = f"MuseFlow_Synced_{genre.upper()}_{random.randint(1000,9999)}.mid"
         output_path = OUTPUT_DIR / output_name
         generated_score.dump_midi(str(output_path))
 
