@@ -749,7 +749,7 @@
           <div class="label">Genres</div>
         </div>
         <div class="hero-stat">
-          <div class="number">500</div>
+          <div class="number">4,000</div>
           <div class="label">Files / Genre</div>
         </div>
         <div class="hero-stat">
@@ -851,7 +851,7 @@
             <tr>
               <td>LR Schedule</td>
               <td class="mono">CosineAnnealing</td>
-              <td>eta_min=1e-6 over 25 epochs</td>
+              <td>eta_min=1e-6 over 50 epochs</td>
             </tr>
             <tr>
               <td>Precision</td>
@@ -892,7 +892,7 @@
               <li>Multi-instrument filter: ≥2 tracks, ≥2 distinct programs, 30–15,000 notes</li>
               <li>Genre classification via scoring heuristic on MIDI program numbers</li>
               <li>Targets: <span class="genre-badge classical">🎻 Classical</span> <span class="genre-badge lofi">🎹
-                  Lofi</span> <span class="genre-badge rock">🎸 Rock</span> — 500 files each</li>
+                  Lofi</span> <span class="genre-badge rock">🎸 Rock</span> — 4,000 files each</li>
             </ul>
           </div>
         </div>
@@ -941,7 +941,7 @@
             <p>The Seq2Seq pairs are fed into the Transformer model. The model learns to predict each next token in the
               combined <code>[Melody | GenreTag | BandArrangement]</code> sequence.</p>
             <ul>
-              <li>25 epochs with cosine annealing LR schedule</li>
+              <li>50 epochs with cosine annealing LR schedule</li>
               <li>Mixed-precision (FP16) for ~50% VRAM savings</li>
               <li>Gradient clipping at max_norm=1.0</li>
               <li>Output: <code>museflow_translator.pth</code> (~40 MB)</li>
@@ -1177,7 +1177,7 @@
           <span class="comment"># Step 3: Tokenize into Seq2Seq pairs</span>
           <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">preprocess.py</span>
 
-          <span class="comment"># Step 4: Train the Transformer (~25 epochs)</span>
+          <span class="comment"># Step 4: Train the Transformer (~50 epochs)</span>
           <span class="prompt">$</span> <span class="cmd">python</span> <span class="file">train.py</span>
 
           <span class="comment"># Step 5: Generate music!</span>
