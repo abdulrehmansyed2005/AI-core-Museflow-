@@ -1,103 +1,84 @@
-# MuseFlow: Deep Technical Architecture & Data Pipeline Guide
+# MuseFlow: Deep Technical Architecture & File Encyclopedia
 
-This is the comprehensive technical reference for the MuseFlow AI Band Arrangement Engine. It details every step from raw audio signals to the final multi-track MIDI production.
-
----
-
-## 📂 1. System Architecture Overview
-
-### Backend Framework
-*   **Engine:** Python 3.10+
-*   **Deep Learning:** PyTorch with CUDA acceleration.
-*   **Web Layer:** Flask with Flask-CORS for cross-origin frontend communication.
-*   **MIDI Engine:** `symusic` (C++ backend) and `miditok` (REMI encoding).
-
-### Hardware Requirements
-*   **Training:** NVIDIA GPU (RTX 3050+ recommended) with `torch.amp` for mixed-precision math.
-*   **Inference:** Works on CPU, but optimized for GPU execution (latency < 10s).
+This document serves as the absolute technical reference for the MuseFlow project. It details the system architecture, data pipeline, and provides an exhaustive breakdown of every file in the repository.
 
 ---
 
-## 🌊 2. The Detailed Data Journey
+## 🌊 1. Global Workflow (The Lifecycle of a Note)
 
-### Step 1: Input Acquisition & Transcription
-When a user records a melody in the browser:
-1.  **Audio Upload:** The `.wav` or `.mp3` is sent to `/api/generate`.
-2.  **Neural Transcription:** `app.py` invokes `basic_pitch.inference`. This uses a CNN-based model to detect onsets, offsets, and pitches, outputting a raw MIDI file.
-3.  **Cleanup (`clean_melody_score`):**
-    *   **Track Selection:** If the transcription creates multiple tracks, we select the one with the most notes.
-    *   **Noise Filtering:** Notes shorter than 40 ticks (noise) are deleted.
-    *   **Quantization:** All notes are snapped to an 8th-note grid (240 ticks at 480 PPQ) to ensure the AI recognizes the rhythm clearly.
-
-### Step 2: The Prompt Window (`loop_melody`)
-The Transformer requires a fixed context length of **128 tokens** for the prompt.
-- If the user's input is too short (e.g., a 2-second hum), the system **loops** the sequence until it reaches exactly 128 tokens.
-- This creates a "motif" effect, ensuring the AI sees a repeating pattern to harmonize against.
-
-### Step 3: Genre Conditioning (The 10k Tokens)
-To steer the AI style, we inject a "Special Token" at the end of the melody:
-- `10000`: Classical
-- `10001`: Lofi
-- `10002`: Rock
-The model is trained to associate these tokens with specific instrument distributions (e.g., `10002` triggers Electric Guitars).
-
-### Step 4: Transformer Inference
-The `MuseFlowTransformer` is a **4-layer, 8-head Causal Transformer**.
-- **Context Size:** 512 tokens (128 prompt + 384 generated).
-- **Sampling Strategy:** 
-    *   **Temperature (0.8):** Controls randomness (higher = more experimental).
-    *   **Top-K (50):** Only allows the 50 most likely next tokens.
-    *   **Top-P (0.95):** "Nucleus Sampling" – only keeps the top tokens whose cumulative probability exceeds 95%.
-- **Autoregression:** The model predicts one token, adds it to the sequence, and uses that new sequence to predict the next.
-
-### Step 5: Post-Processing Pipeline
-Raw tokens are decoded back into MIDI, but require "Studio Polish":
-1.  **Syncing:** The generated band is clipped or looped to match the exact duration of the user's input melody.
-2.  **Consolidation (`consolidate_tracks`):** The AI often outputs instruments track-by-track. This function merges all tracks sharing the same MIDI Program (e.g., merging 5 guitar fragments into 1 guitar track).
-3.  **Normalization (`normalize_score`):** Shifts all tracks so they begin exactly at Tick 0.
-4.  **Humanization (`humanize_durations`):** 
-    *   Applies ±15% duration jitter.
-    *   Applies ±5% onset drift.
-    *   This prevents the "robotic" feel of perfectly quantized music.
+1.  **Input:** User records audio or MIDI in `frontend/index.html`.
+2.  **Transcription:** `basic_pitch` in `backend/app.py` converts audio to MIDI.
+3.  **Cleaning:** `app.py` quantizes the melody to an 8th-note grid.
+4.  **Tokenization:** `miditok` converts MIDI into REMI integers.
+5.  **Inference:** `MuseFlowTransformer` predicts a band accompaniment based on a Genre Tag (10000-10002).
+6.  **Decoding:** Tokens are converted back to MIDI tracks.
+7.  **Polish:** `app.py` merges tracks, syncs durations, and adds ±15% timing jitter.
+8.  **Output:** A multi-track MIDI file is served for download.
 
 ---
 
-## 🛠️ 3. Deep File Breakdown
+## 📂 2. File-by-File Encyclopedia
 
-### `backend/app.py` (The Central Controller)
-*   `MuseFlowTransformer`: Class defining the neural network.
-*   `sample_next_token`: Implementation of the Top-K/Top-P math.
-*   `/api/generate`: The main logic pipeline that ties transcription, inference, and polish together.
+### 🏢 Root Directory (Project Management)
+*   **`README.md`**: The primary documentation. Contains installation steps, project overview, and quick-start commands.
+*   **`project_report.html`**: The formal technical report. Includes architectural diagrams, training statistics (12,000 files), and performance analysis.
+*   **`Museflow-guide.html`**: A user-facing manual explaining how to use the web interface effectively.
+*   **`MUSEFLOW_TEAM_GUIDE.md`**: (This file) The deep technical reference for team members and developers.
+*   **`MuseFlow_Project_Poster.png`**: A high-resolution marketing/academic poster summarizing the project for evaluations.
+*   **`.gitignore`**: Tells Git to ignore heavy folders like `dataset/`, `tokens_seq2seq/`, `env/`, and `__pycache__` to keep the repository clean.
+*   **`MuseFlow.code-workspace`**: VS Code configuration file that sets up the workspace environment for the team.
 
-### `backend/train.py` (The Optimizer)
-*   **Loss Function:** CrossEntropyLoss with `ignore_index=0` (ignores padding).
-*   **Optimizer:** AdamW with Weight Decay (0.01) to prevent the model from getting stuck in "musical loops."
-*   **Scheduler:** CosineAnnealingLR (gradually lowers the learning rate as training nears completion).
+### 🎨 `frontend/` (The User Interface)
+*   **`index.html`**: The main structure. Includes the recording interface, genre selectors, and the MIDI player visualization.
+*   **`style.css`**: Defines the "Glassmorphism" aesthetic. Uses modern CSS variables for dark-mode themes, gradients, and responsive layouts.
+*   **`script.js`**: The "brain" of the UI. It handles the `Web Audio API` for recording, sends multi-part form data to the Flask API, and manages the progress bars.
 
-### `backend/preprocess.py` (The Translator)
-*   Uses `REMI` tokenization.
-*   **REMI Structure:** `Position` -> `Program` -> `Pitch` -> `Velocity` -> `Duration`.
-*   This structured "language" allows the AI to understand that a "Piano" (Program 0) is playing a "C4" (Pitch 60).
+### ⚙️ `backend/` (The AI Engine)
 
-### `backend/rescue.py` (The Lofi Logic)
-*   Specifically designed for Lofi files that often come as a single track.
-*   Uses **Pitch Thresholds** to split one track into three:
-    *   **Melody:** >72 (High register)
-    *   **Pad:** 48–71 (Mid register)
-    *   **Bass:** <48 (Low register)
+#### **Core Logic & API**
+*   **`app.py`**: The most critical file.
+    *   **Purpose:** Serves the Flask API and manages the generation pipeline.
+    *   **Key Functions:** `clean_melody_score` (Quantizer), `loop_melody` (Tiler), `consolidate_tracks` (Track Merger), `humanize_durations` (Timing Jitter).
+*   **`requirements.txt`**: Lists all Python dependencies (`torch`, `flask`, `symusic`, `miditok`, `basic-pitch`).
+*   **`museflow_translator.pth`**: The trained model weights. It contains the millions of learned parameters from the 50-epoch training run.
+
+#### **Training & Data Pipeline**
+*   **`train.py`**: The training script.
+    *   **Logic:** Implements a Seq2Seq training loop with `AdamW` optimization and `CosineAnnealing` learning rate scheduling.
+    *   **Features:** Uses `torch.amp` (Mixed Precision) to allow training on consumer GPUs like the RTX 3050.
+*   **`preprocess.py`**: The data formatter.
+    *   **Logic:** Reads MIDI files, identifies the melody track, and pairs it with the rest of the band. It saves these as JSON token pairs in `tokens_seq2seq/`.
+*   **`download_dataset.py`**: The data harvester.
+    *   **Logic:** Automatically downloads the Lakh MIDI Dataset and classifies files into genres using a "point-based" instrument scoring system.
+*   **`get_classical_data.py`**: A specialized script that uses the `music21` library to extract 100+ Bach chorales to ensure high-quality classical training data.
+*   **`rescue.py`**: The Lofi fixer. It takes single-track MIDI files and use pitch-thresholding to "rescue" them into multi-track formats (Melody, Pad, Bass).
+
+#### **Utilities & Testing**
+*   **`generate.py`**: A standalone command-line version of the generator. Useful for testing the model without starting the full web server.
+*   **`test_gpu.py`**: A simple script to verify that PyTorch can see your NVIDIA GPU and CUDA is properly configured.
+*   **`transcribe.py`**: A standalone script to test the `basic_pitch` audio-to-MIDI transcription logic.
+*   **`confusion_matrix.png`**: A visual chart showing how accurately the model classifies and generates different genres.
 
 ---
 
-## 🎹 4. Understanding REMI Tokens
-Team members should know that the AI doesn't see "notes." It sees a sequence of numbers:
-- **0:** Padding (Silence)
-- **1-16:** Time positions in a bar.
-- **17-144:** Note pitches (Piano keys).
-- **10000+:** Genre tags.
+## 🧠 3. Deep Neural Logic
+
+### Transformer Parameters
+- **Layers:** 4 Encoder layers.
+- **Heads:** 8 Attention heads per layer.
+- **Embedding Dim:** 256.
+- **Sequence Length:** 512 tokens.
+
+### Sampling Math
+- **Temperature (0.8):** We use 0.8 because 1.0 was too chaotic and 0.5 was too repetitive. 0.8 provides the best balance of "musical creativity."
+- **Top-P (0.95):** This ensures the model never picks a token with near-zero probability, eliminating "sour notes" from the output.
 
 ---
 
-## 📊 5. Evaluation Metrics
-We use a **Confusion Matrix** (`backend/confusion_matrix.png`) to measure how well the model distinguishes genres.
-- **Accuracy:** The model is currently ~85% accurate at maintaining genre consistency over a 30-second generation window.
-- **Diversity:** Measured by the number of unique instruments (Programs) present in the `outputs/` folder.
+## 🎹 4. REMI Token Breakdown
+Every note the AI "hears" is translated into these specific tokens:
+1.  **Bar/Position:** Grid timing (where in the measure).
+2.  **Program:** Which instrument (Piano, Guitar, etc).
+3.  **Pitch:** The MIDI note number (0-127).
+4.  **Duration:** How long the note is held.
+5.  **Genre:** The style "anchor" (10000+).
