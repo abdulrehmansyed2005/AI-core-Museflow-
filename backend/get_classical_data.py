@@ -2,29 +2,30 @@ import music21
 from pathlib import Path
 
 def download_bach_chorales():
-    # Make sure the folder exists
+    # Ensure that the output directory for classical music exists
     output_dir = Path("dataset/classical")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print("🔍 Searching MIT's music21 corpus for Bach Chorales...")
-    # This grabs the internal file paths for all Bach pieces in the library
+    print("Searching for Bach Chorales")
+    # Retrieve file paths for Bach musical pieces from the internal library corpus
     bach_paths = music21.corpus.getComposer('bach')
     
-    print(f"✅ Found {len(bach_paths)} pieces. Extracting the first 100 as MIDI...")
+    print(f"Found pieces Extracting the first one hundred as midi files")
     
     success_count = 0
-    # We will just grab 100 to keep it fast and perfectly sized for your RTX 3050
+    # Select a limited number of pieces to maintain efficient processing speed
     for i, path in enumerate(bach_paths[:100]):
         try:
-            # Parse the sheet music and write it directly to a .mid file
+            # Parse the musical notation and export it as a midi file
             score = music21.corpus.parse(path)
             midi_filename = output_dir / f"bach_chorale_{i:03d}.mid"
             score.write('midi', fp=str(midi_filename))
             success_count += 1
         except Exception as e:
-            continue # Skip any weird files
+            # Ignore files that fail to parse correctly
+            continue
 
-    print(f"🎉 Done! Successfully extracted {success_count} multi-track MIDI files into {output_dir}")
+    print(f"Done Successfully extracted midi files into output directory")
 
 if __name__ == "__main__":
     download_bach_chorales()

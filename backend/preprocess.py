@@ -9,26 +9,26 @@ from miditok import REMI, TokenizerConfig
 from symusic import Score
 
 def build_tokenizer():
-    # 1. We inject our custom GENRE SWITCH tokens into the AI's vocabulary
+    # Inject custom genre switch tokens into the model vocabulary
     config = TokenizerConfig(
         num_velocities=32,
         use_chords=True,
         use_programs=True, 
         use_tempos=True,
-        special_tokens=["[CLASSICAL]", "[LOFI]", "[ROCK]"]  # The magic buttons
+        special_tokens=["[CLASSICAL]", "[LOFI]", "[ROCK]"]  # Genre control tokens used for steering the model generation
     )
     tokenizer = REMI(config)
     return tokenizer
 
 def process_seq2seq():
     tokenizer = build_tokenizer()
-    # We create a new folder so we don't mix up Phase 1 and Phase 2 data
+    # Create a new folder to store tokenized sequence to sequence data
     token_dir = Path("tokens_seq2seq")
     token_dir.mkdir(exist_ok=True)
     
     genres = ["classical", "lofi", "rock"]
     
-    # Bulletproof Genre IDs (These numbers act as our magic buttons)
+    # Define unique identification numbers for each music genre
     genre_ids = {
         "classical": 10000, 
         "lofi": 10001,
@@ -49,11 +49,11 @@ def process_seq2seq():
             try:
                 midi = Score(file_path)
                 
-                # We need at least 2 tracks to have a "Melody" and a "Band"
+                # Require at least two tracks for melody and accompaniment splitting
                 if len(midi.tracks) < 2:
                     continue
                     
-                # 2. Find the Melody (The track with the highest average pitch)
+                # Identify the melody as the track with the highest average pitch
                 highest_pitch = -1
                 melody_idx = 0
                 
@@ -64,43 +64,43 @@ def process_seq2seq():
                             highest_pitch = avg_pitch
                             melody_idx = idx
                             
-                # 3. Create two blank sheets of music
+                # Create blank scores for the melody and band tracks
                 prompt_score = Score(midi.ticks_per_quarter)
                 target_score = Score(midi.ticks_per_quarter)
                 
-                # 4. Put the Melody on one sheet, and the Band on the other
+                # Separate the melody track from the rest of the accompaniment tracks
                 for idx, track in enumerate(midi.tracks):
                     if idx == melody_idx:
                         prompt_score.tracks.append(track)
                     else:
                         target_score.tracks.append(track)
                         
-                # 5. Translate both to math
+                # Convert musical scores into tokenized integer sequences
                 prompt_tokens = tokenizer(prompt_score).ids
                 target_tokens = tokenizer(target_score).ids
                 
-                # Flatten the lists if miditok outputs 2D arrays
+                # Flatten the token lists if they are in a multi dimensional format
                 if isinstance(prompt_tokens[0], list): 
                     prompt_tokens = [item for sublist in prompt_tokens for item in sublist]
                 if isinstance(target_tokens[0], list): 
                     target_tokens = [item for sublist in target_tokens for item in sublist]
                 
-                # 6. THE ALCHEMY: Inject the Genre Tag at the start of the Band's music
+                # Insert the specific genre identification tag at the beginning of the band sequence
                 target_tokens.insert(0, genre_ids[genre])
                 
-                # 7. Save the Seq2Seq Pair
+                # Save the processed melody and band pairs as a json file
                 out_file = token_dir / f"{genre}_{i:03d}.json"
                 with open(out_file, 'w') as f:
                     json.dump({
                         "genre": genre, 
-                        "prompt": prompt_tokens, # The Melody Input
-                        "target": target_tokens  # The Genre Tag + Band Output
+                        "prompt": prompt_tokens, # Melody input sequence for the model
+                        "target": target_tokens  # Genre tag and band output sequence from the model
                     }, f)
                     
                 success_count += 1
                 
             except Exception as e:
-                # Skip corrupted or incompatible files quietly
+                # Ignore files that cannot be processed properly
                 continue
                 
         print(f"✅ Successfully created {success_count} Seq2Seq pairs for {genre}.")

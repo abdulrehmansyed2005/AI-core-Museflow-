@@ -1,7 +1,5 @@
-"""
-MuseFlow Web API
-Flask server that wraps the generation pipeline for the web UI.
-"""
+# MuseFlow Web API
+# Flask server for the web interface generation pipeline
 
 
 import sys, io
@@ -21,7 +19,7 @@ from flask_cors import CORS
 from pathlib import Path
 from werkzeug.utils import secure_filename
 
-# --- Model Architecture (must match train.py) ---
+# Model Architecture defines the transformer neural network structure
 class MuseFlowTransformer(nn.Module):
     def __init__(self, vocab_size, d_model=256, nhead=8, num_layers=4):
         super().__init__()
@@ -37,7 +35,7 @@ class MuseFlowTransformer(nn.Module):
         return self.fc_out(out)
 
 
-# --- Sampling ---
+# Sampling functions for choosing the next musical token
 def sample_next_token(logits, temperature=0.9, top_k=50, top_p=0.95):
     logits = logits / temperature
     if top_k > 0:
@@ -56,7 +54,7 @@ def sample_next_token(logits, temperature=0.9, top_k=50, top_p=0.95):
     return torch.multinomial(probs, num_samples=1).item()
 
 
-# --- Melody Looper ---
+# Melody Looper repeats short input melodies to fill the sequence length
 def loop_melody(raw_tokens, target_length=128):
     real_tokens = [t for t in raw_tokens if t != 0]
     if len(real_tokens) == 0:
@@ -69,7 +67,7 @@ def loop_melody(raw_tokens, target_length=128):
     return looped[:target_length]
 
 
-# --- Duration Humanizer ---
+# Duration Humanizer adds natural timing variations to the output
 def humanize_durations(score, jitter_pct=0.15):
     for track in score.tracks:
         for note in track.notes:
@@ -82,7 +80,7 @@ def humanize_durations(score, jitter_pct=0.15):
     return score
 
 
-# --- MIDI Cleaner & Quantizer ---
+# MIDI Cleaner and Quantizer prepares input audio transcriptions for the model
 def clean_melody_score(score):
     """
     Sanitizes raw MIDI (especially from basic_pitch) to match training data:
@@ -102,7 +100,7 @@ def clean_melody_score(score):
     
     new_notes = []
     for note in best_track.notes:
-        if note.duration < 40: continue # Skip noise
+        if note.duration < 40: continue # Skip noise note values
         
         # Snap onset and duration to 8th note grid
         note.time = round(note.time / ticks_per_8th) * ticks_per_8th
@@ -197,7 +195,7 @@ def consolidate_tracks(score):
 
 
 
-# --- Flask App ---
+# Flask App configuration and initialization
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
@@ -206,14 +204,14 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# --- Load Model Once at Startup ---
+# Load Model Once at Startup to prepare for generation requests
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[MuseFlow API] Device: {device.type.upper()}")
 
-# Calculate vocab size
+# Calculate vocabulary size based on training data tokens
 vocab_size = 0
 token_files = sorted(Path("tokens_seq2seq").glob("*.json"))
-for file in token_files[:100]:  # Sample first 100 for speed
+for file in token_files[:100]:  # Sample first one hundred files for processing speed
     with open(file, 'r') as f:
         content = json.load(f)
         vocab_size = max(vocab_size, max(content['prompt'] + content['target']) + 1)
@@ -234,7 +232,7 @@ model.eval()
 print(f"[MuseFlow API] Model loaded! ({sum(p.numel() for p in model.parameters()):,} params)")
 
 
-# --- Routes ---
+# API Routes for handling web requests
 
 @app.route('/')
 def index():
@@ -257,12 +255,12 @@ def generate():
         genre = request.form.get('genre', 'classical').lower()
         num_loops = int(request.form.get('loops', 4))
         num_loops = max(1, min(8, num_loops))
-        temperature = float(request.form.get('temperature', 0.8)) # Lowered default for rhythm
+        temperature = float(request.form.get('temperature', 0.8)) # Lowered default value to improve rhythm stability
 
         genre_tags = {"classical": 10000, "lofi": 10001, "rock": 10002}
         genre_tag = genre_tags.get(genre, 10000)
 
-        # Check for uploaded MIDI
+        # Check for uploaded musical instrument digital interface files
         melody_tokens = None
         if 'melody' in request.files:
             file = request.files['melody']
@@ -271,7 +269,7 @@ def generate():
                 filepath = UPLOAD_DIR / filename
                 file.save(str(filepath))
 
-                # Tokenize the uploaded MIDI
+                # Tokenize the uploaded musical instrument digital interface file
                 from miditok import REMI, TokenizerConfig
                 from symusic import Score
 
@@ -282,11 +280,11 @@ def generate():
                 tokenizer = REMI(config)
 
                 if filename.endswith('.wav') or filename.endswith('.mp3'):
-                    # Transcribe audio to MIDI first
+                    # Transcribe audio recordings to musical instrument digital interface first
                     from basic_pitch.inference import predict_and_save
                     from basic_pitch import ICASSP_2022_MODEL_PATH
                     
-                    # Delete old transcription if it exists (basic_pitch won't overwrite)
+                    # Delete old transcription if it exists because basic pitch will not overwrite files
                     midi_path = UPLOAD_DIR / f"{Path(filename).stem}_basic_pitch.mid"
                     if midi_path.exists():
                         midi_path.unlink()
@@ -300,19 +298,19 @@ def generate():
                             model_or_model_path=ICASSP_2022_MODEL_PATH
                         )
                     except UnicodeEncodeError:
-                        pass  # basic_pitch emoji print failed on Windows — MIDI was already saved
+                        pass  # basic pitch print operation failed on windows but midi was already saved
                     melody_score = Score(str(midi_path))
                 else:
                     melody_score = Score(str(filepath))
 
-                # ✨ CLEAN & QUANTIZE custom melody
+                # Clean and quantize the uploaded custom melody for better processing
                 melody_score = clean_melody_score(melody_score)
 
                 melody_tokens = tokenizer(melody_score).ids
                 if isinstance(melody_tokens[0], list):
                     melody_tokens = [t for sub in melody_tokens for t in sub]
 
-        # Fallback: random melody from dataset
+        # Fallback to random melody from the dataset if no file is provided
         if melody_tokens is None:
             random_file = random.choice(token_files)
             with open(random_file, 'r') as f:
@@ -321,8 +319,7 @@ def generate():
         # Loop melody to fill prompt window
         melody_prompt = loop_melody(melody_tokens, target_length=128)
 
-        # Build starting sequence
-        # 200 tokens/loop: enough for multi-instrument phrases without overloading
+        # Build starting sequence using enough tokens for multi instrument phrases without overloading the model memory
         gen_tokens = num_loops * 200
         current_sequence = melody_prompt + [genre_tag]
 
@@ -336,33 +333,33 @@ def generate():
             next_token = sample_next_token(logits, temperature=temperature, top_k=50, top_p=0.95)
             current_sequence.append(next_token)
 
-        # 1. Decode the original melody
+        # Decode the original melody sequence
         melody_only_tokens = [t for t in melody_prompt if t not in [10000, 10001, 10002] and t != 0]
         melody_score = tokenizer.decode(melody_only_tokens)
         
-        # Calculate melody duration (the "Master Window")
+        # Calculate melody duration to define the master window size
         melody_duration = 0
         if melody_score.tracks:
             melody_score.tracks[0].name = "Main Melody"
             if melody_score.tracks[0].notes:
                 melody_duration = max(n.time + n.duration for n in melody_score.tracks[0].notes)
 
-        # 2. Decode the generated band
+        # Decode the generated band accompaniment sequence
         generated_only = current_sequence[129:]
         band_tokens = [t for t in generated_only if t not in [10000, 10001, 10002] and t != 0]
         band_score = tokenizer.decode(band_tokens)
 
-        # 3. Combine and Constrain to Melody Duration
+        # Combine and constrain the generated output to match the melody duration window
         for track in band_score.tracks:
             if not track.notes: continue
             
-            # Sort and Shift to 0
+            # Sort and shift track timing to zero start point
             track.notes.sort(key=lambda n: n.time)
             first_onset = track.notes[0].time
             for n in track.notes:
                 n.time = max(0, n.time - first_onset)
             
-            # Loop/Clip to fit the Melody Window
+            # Loop or clip the band tracks to fit the melody window length
             if melody_duration > 0:
                 original_notes = [n for n in track.notes if n.time < melody_duration]
                 if not original_notes: continue
@@ -391,12 +388,12 @@ def generate():
         
         generated_score = melody_score
 
-        # 4. Final Polish
+        # Final polish operations for the generated music output
         generated_score = quantize_score(generated_score, grid_division=4)
         generated_score = normalize_score(generated_score)
         generated_score = humanize_durations(generated_score, jitter_pct=0.05)
 
-        # Tempo and Save
+        # Set tempo and save the final file output
         from symusic import Tempo as SyTempo
         if not generated_score.tempos:
             generated_score.tempos.append(SyTempo(0, 120.0))
@@ -405,7 +402,7 @@ def generate():
         output_path = OUTPUT_DIR / output_name
         generated_score.dump_midi(str(output_path))
 
-        # Track info
+        # Collect information about the musical tracks in the output score
         tracks = []
         for idx, track in enumerate(generated_score.tracks):
             tracks.append({

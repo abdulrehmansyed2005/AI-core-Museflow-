@@ -1,8 +1,6 @@
-"""
-MuseFlow Dataset Downloader & Genre Classifier
-Downloads the Lakh MIDI Clean subset and filters into genre folders.
-Only keeps multi-instrument files (≥2 tracks, ≥2 distinct programs).
-"""
+# MuseFlow Dataset Downloader and Genre Classifier
+# Downloads the Lakh MIDI Clean subset and filters into genre folders
+# Only keeps multi instrument files with at least two tracks and distinct programs
 
 import os
 import sys
@@ -17,7 +15,7 @@ from pathlib import Path
 
 from symusic import Score
 
-# --- CONFIGURATION ---
+# Configuration settings for dataset download and extraction paths
 LAKH_URL = "http://hog.ee.columbia.edu/craffel/lmd/clean_midi.tar.gz"
 DOWNLOAD_DIR = Path("_lakh_download")
 EXTRACT_DIR = DOWNLOAD_DIR / "clean_midi"
@@ -26,11 +24,11 @@ TAR_FILE = DOWNLOAD_DIR / "clean_midi.tar.gz"
 DATASET_DIR = Path("dataset")
 TARGET_PER_GENRE = 4000
 
-# Minimum requirements — relaxed to catch more files
-MIN_TRACKS = 2          # At least 2 tracks with notes
-MIN_PROGRAMS = 2        # At least 2 different instruments (no piano-only)
-MIN_NOTES = 30          # Don't want near-empty files
-MAX_NOTES = 15000       # Don't want absurdly huge files
+# Minimum requirements to ensure high quality midi files for training
+MIN_TRACKS = 2          # At least two tracks with notes required
+MIN_PROGRAMS = 2        # At least two different instruments needed to avoid piano only files
+MIN_NOTES = 30          # Filter out files that are nearly empty
+MAX_NOTES = 15000       # Filter out files that are excessively large
 
 
 def download_lakh():
@@ -39,7 +37,7 @@ def download_lakh():
     
     if TAR_FILE.exists():
         size_mb = TAR_FILE.stat().st_size / (1024 * 1024)
-        print(f"✅ Archive already downloaded: {TAR_FILE} ({size_mb:.0f} MB)")
+        print(f"Archive already downloaded")
         return
     
     print(f"⬇️  Downloading Lakh MIDI Clean...")
@@ -90,10 +88,10 @@ def extract_lakh():
 
 def classify_genre(programs, has_drums):
     """
-    Classify genre based on instrument programs.
-    Piano (prog 0) is allowed in ALL genres — the key is what ELSE is there.
+    Classify genre based on instrument programs
+    Piano is allowed in all genres the key is what else is present
     """
-    # Check for genre-defining instruments
+    # Check for specific instruments that define musical genres
     has_electric_guitar = bool(programs & set(range(25, 32)))
     has_distortion = bool(programs & {29, 30})
     has_bass = bool(programs & set(range(32, 40)))
@@ -111,7 +109,7 @@ def classify_genre(programs, has_drums):
     classical_score = 0
     lofi_score = 0
     
-    # --- ROCK: Electric guitars are the strongest signal ---
+    # Rock genre classification based on electric guitar signals
     if has_electric_guitar:
         rock_score += 6
     if has_distortion:
@@ -125,7 +123,7 @@ def classify_genre(programs, has_drums):
     if has_drums and has_bass and not has_strings:
         rock_score += 1
     
-    # --- CLASSICAL: Strings + orchestral instruments ---
+    # Classical genre classification based on string and orchestral instruments
     if has_strings:
         classical_score += 4
     if has_woodwinds:
@@ -139,7 +137,7 @@ def classify_genre(programs, has_drums):
     if has_acoustic_guitar and has_strings:
         classical_score += 1
     
-    # --- LOFI: Electric piano, pads, soft instruments ---
+    # Lofi genre classification based on electric piano and pads
     if has_epiano:
         lofi_score += 5
     if has_pads:
@@ -197,7 +195,7 @@ def filter_and_classify():
                 skipped["too_few_tracks"] += 1
                 continue
             
-            # Filter 2: Instrument diversity (no piano-only!)
+            # Ensure instrument diversity to avoid simple piano files
             programs = set()
             total_notes = 0
             has_drums = False
@@ -211,7 +209,7 @@ def filter_and_classify():
                 skipped["too_few_programs"] += 1
                 continue
             
-            # Filter 3: Note count
+            # Note count filtering
             if total_notes < MIN_NOTES:
                 skipped["too_few_notes"] += 1
                 continue
@@ -219,11 +217,11 @@ def filter_and_classify():
                 skipped["too_many_notes"] += 1
                 continue
             
-            # Classify genre
+            # Classify genre and handle unknown cases
             genre = classify_genre(programs, has_drums)
             
             if genre == "unknown":
-                # Fallback: assign to whichever genre needs files most
+                # Assign to whichever genre needs files most
                 need = {g: TARGET_PER_GENRE - c for g, c in genre_counts.items() if c < TARGET_PER_GENRE}
                 if need:
                     genre = max(need, key=lambda k: need[k])
@@ -244,18 +242,10 @@ def filter_and_classify():
             skipped["error"] += 1
             continue
     
-    # Report
-    print(f"\n{'='*50}")
-    print(f"📊 DATASET BUILD COMPLETE")
-    print(f"{'='*50}")
-    for genre, count in genre_counts.items():
-        status = "✅" if count >= TARGET_PER_GENRE else "⚠️"
-        print(f"  {status} {genre:12s}: {count:5d} / {TARGET_PER_GENRE}")
-    print(f"\n  Skipped:")
+    print(f"Data status shown here")
     for reason, count in skipped.items():
         if count > 0:
-            print(f"    {reason:20s}: {count}")
-    print(f"{'='*50}")
+            print(f"    {reason} {count}")
     
     return genre_counts
 

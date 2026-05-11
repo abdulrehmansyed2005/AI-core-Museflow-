@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 import json
 from pathlib import Path
 
-# --- 1. THE NEW SEQ2SEQ DATA LOADER ---
+# Sequence to Sequence Data Loader for training on melody and band pairs
 class Seq2SeqDataset(Dataset):
     def __init__(self, prompt_len=128, target_len=384, max_per_genre=4000):
         self.data = []
@@ -17,7 +17,7 @@ class Seq2SeqDataset(Dataset):
         print("Loading Melody-to-Band pairs into memory...")
         token_dir = Path("tokens_seq2seq")
         
-        # Group files by genre prefix and cap each at max_per_genre
+        # Group files by genre prefix and cap each at the maximum per genre count
         genres = ["classical", "lofi", "rock"]
         selected_files = []
         for genre in genres:
@@ -32,15 +32,15 @@ class Seq2SeqDataset(Dataset):
                 prompt = content['prompt']
                 target = content['target']
                 
-                # Pad sequences with 0s if they are too short, or chop them if they are too long
+                # Pad sequences with zeros if they are too short or truncate if they are too long
                 prompt = (prompt + [0] * prompt_len)[:prompt_len]
                 target = (target + [0] * target_len)[:target_len]
                 
-                # Stitch them together: [128 Melody Tokens] + [384 Genre & Band Tokens]
+                # Combine the melody tokens and band tokens into one sequence sequence of one hundred twenty eight melody tokens plus three hundred eighty four genre and band tokens
                 seq = prompt + target
                 self.data.append(seq)
                 
-                # Dynamically calculate vocabulary size (making sure to catch our 10001 genre tags)
+                # Calculate vocabulary size based on the highest token value in the data
                 self.vocab_size = max(self.vocab_size, max(seq) + 1)
                 
         print(f"Loaded {len(self.data)} Seq2Seq pairs. Vocabulary size: {self.vocab_size}")
@@ -55,7 +55,7 @@ class Seq2SeqDataset(Dataset):
         y = sequence[1:]  
         return x, y
 
-# --- 2. THE TRANSFORMER BRAIN ---
+# Transformer Brain defines the model architecture
 class MuseFlowTransformer(nn.Module):
     def __init__(self, vocab_size, d_model=256, nhead=8, num_layers=4):
         super().__init__()
@@ -70,30 +70,30 @@ class MuseFlowTransformer(nn.Module):
         out = self.transformer(embedded, mask=mask, is_causal=True)
         return self.fc_out(out)
 
-# --- 3. THE TRAINING LOOP (Now with Mixed Precision & LR Scheduling) ---
+# Training loop handles the model optimization with precision and scheduling features
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    use_amp = device.type == "cuda"  # Mixed precision only on GPU
+    use_amp = device.type == "cuda"  # Enable mixed precision only when a CUDA GPU is available
     print(f"🔥 Booting up the Translator on: {device.type.upper()}")
     if not use_amp:
         print("⚠️  No CUDA GPU detected — training on CPU (slower, no mixed precision)")
 
     dataset = Seq2SeqDataset(prompt_len=128, target_len=384)
     
-    # Batch size 4 with mixed precision fits in 6GB VRAM for 512-token sequences
+    # Batch size fits within memory constraints for the sequence length
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
     model = MuseFlowTransformer(vocab_size=dataset.vocab_size).to(device)
     
-    # Lower LR + cosine decay = much more stable training for Transformers
+    # Using AdamW optimizer with weight decay for better transformer stability
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=0.01)
-    criterion = nn.CrossEntropyLoss(ignore_index=0)  # Ignore padding zeros
+    criterion = nn.CrossEntropyLoss(ignore_index=0)  # Ignore padding zeros during loss calculation
     
-    # Higher epoch count for more data
+    # Higher epoch count to process more data during training
     epochs = 50
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
     
-    # Mixed precision scaler — halves VRAM usage by using float16 where safe
+    # Mixed precision scaler reduces memory usage by using lower precision math
     scaler = torch.amp.GradScaler('cuda') if use_amp else None
     
     mode_str = "mixed precision" if use_amp else "float32 (CPU)"
@@ -110,7 +110,7 @@ def train():
             optimizer.zero_grad()
             
             if use_amp:
-                # Mixed precision forward pass (GPU)
+                # Mixed precision forward pass for GPU acceleration
                 with torch.amp.autocast('cuda'):
                     predictions = model(x)
                     loss = criterion(predictions.transpose(1, 2), y)
@@ -120,7 +120,7 @@ def train():
                 scaler.step(optimizer)
                 scaler.update()
             else:
-                # Standard forward pass (CPU)
+                # Standard forward pass for CPU fallback
                 predictions = model(x)
                 loss = criterion(predictions.transpose(1, 2), y)
                 loss.backward()
